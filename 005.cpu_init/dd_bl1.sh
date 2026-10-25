@@ -1,0 +1,1 @@
+dd if=cpu_init.bin of=/dev/sdb bs=512 count=1 seek=7743470

@@ -1,0 +1,55 @@
+TEXT_BASE = 0x0C000000
+
+#CROSS_COMPILE = arm-linux-
+CROSS_COMPILE = arm-linux-gnueabi-
+
+LD	= $(CROSS_COMPILE)ld
+CC	= $(CROSS_COMPILE)gcc
+
+OBJCOPY = $(CROSS_COMPILE)objcopy
+OBJDUMP = $(CROSS_COMPILE)objdump
+
+PLATFORM_RELFLAGS += -fno-strict-aliasing  -fno-common -ffixed-r8 -msoft-float
+
+PLATFORM_CPPFLAGS =
+PLATFORM_CPPFLAGS += -DCONFIG_ARM -D__ARM__
+PLATFORM_CPPFLAGS += -march=armv5t -marm
+
+DBGFLAGS = -g # -DDEBUG
+OPTFLAGS = -Os #-fomit-frame-pointer
+RELFLAGS= $(PLATFORM_RELFLAGS)
+
+CPPFLAGS := $(DBGFLAGS) $(OPTFLAGS) $(RELFLAGS) -D__KERNEL__ -DTEXT_BASE=$(TEXT_BASE) 
+
+gccincdir := $(shell $(CC) -print-file-name=include)
+
+CPPFLAGS += -Iinclude
+CPPFLAGS += -fno-builtin -ffreestanding -nostdinc -isystem $(gccincdir) -pipe $(PLATFORM_CPPFLAGS)
+
+AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
+
+CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes
+
+export	CROSS_COMPILE LD CC OBJCOPY OBJDUMP
+export	TEXT_BASE PLATFORM_CPPFLAGS PLATFORM_RELFLAGS CPPFLAGS CFLAGS AFLAGS
+
+objs := start.o cpu_init.o clock_init.o uart_init.o mem_init.o mmu_init.o 
+objs += d-tcm.o
+objs += led.o serial.o
+objs += div0.o
+objs += _ashldi3.o _ashrdi3.o _divsi3.o _lshrdi3.o _modsi3.o _udivsi3.o _umodsi3.o
+objs += dlmalloc.o string.o ctype.o vsprintf.o #div64.o display_options.o 
+objs += main.o
+
+all: $(objs)
+	$(LD) -Tu-boot.lds -Ttext $(TEXT_BASE) $^ -o printf.elf
+	$(OBJCOPY) -O binary printf.elf printf.bin
+	$(OBJDUMP) -D printf.elf > printf.dis
+
+%.o:	%.S
+	$(CC) $(AFLAGS) -c -o $@ $<
+%.o:	%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+clean:
+	rm -f *.o printf.elf printf.bin printf.dis
